@@ -53,15 +53,11 @@ services:
       - postgres
 
   superset:
-    image: apache/superset:latest
+    image: apache/superset:latest-dev
     container_name: superset
     environment:
       - SUPERSET_SECRET_KEY=supersecretkey
-      - DATABASE_DB=superset
-      - DATABASE_HOST=postgres
-      - DATABASE_PASSWORD=postgres
-      - DATABASE_USER=postgres
-      - DATABASE_PORT=5432
+      - SQLALCHEMY_DATABASE_URI=postgresql+psycopg2://postgres:postgres@postgres:5432/superset
     ports:
       - 8088:8088
     networks:
