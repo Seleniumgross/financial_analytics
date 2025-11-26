@@ -5,7 +5,6 @@ from unidecode import unidecode
 
 import fitz
 
-
 PATH = '../input/sber'
 FILENAMES = glob.glob(PATH + '/*.pdf')
 
@@ -15,53 +14,79 @@ def get_transactions():
 
     for filename in FILENAMES:
         file = fitz.open(filename)
-        pat_date = re.compile(r'(\d{2}.\d{2}.\d{4})')
-        pat_time = re.compile(r'(\d{2}:\d{2})')
-        num_fields = 8
 
         for page in file:
-            rows = page.get_text().split('\n')
-            i = 11
+            text = page.get_text()
+            lines = text.split('\n')
 
-            while i < len(rows) - 1:
+            i = 0
+            while i < len(lines) - 3:
+                # Ищем дату операции в формате 10.11.2025
+                if re.match(r'\d{2}\.\d{2}\.\d{4}', lines[i]):
+                    trans_date = lines[i]
 
-                if rows[i] == 'Продолжение на следующей странице'\
-                        or 'Дергунова К. А.' in rows[i]:
-                    break
+                    # Проверяем есть ли время на следующей строке
+                    if i + 1 < len(lines) and ':' in lines[i + 1]:
+                        trans_time = lines[i + 1]
+                        category = lines[i + 2] if i + 2 < len(lines) else ""
+                        amount_str = lines[i + 3] if i + 3 < len(lines) else ""
 
-                date = rows[i][:10]
-                time = rows[i + 1][:5]
+                        # Пропускаем строку с датой обработки и кодом
+                        if i + 4 < len(lines) and re.match(r'\d{2}\.\d{2}\.\d{4}', lines[i + 4]):
+                            description = lines[i + 5] if i + 5 < len(lines) else ""
+                            i += 6
+                        else:
+                            description = ""
+                            i += 4
+                    else:
+                        # Если нет времени, ищем категорию и сумму
+                        trans_time = '00:00'
+                        category = lines[i + 1] if i + 1 < len(lines) else ""
+                        amount_str = lines[i + 2] if i + 2 < len(lines) else ""
+                        description = lines[i + 3] if i + 3 < len(lines) else ""
+                        i += 4
 
-                if pat_date.search(date) and pat_time.search(time):
-                    trans_date, trans_time, auth_code, category, trans_sum_str, _, transfer_date, text = rows[i:i + num_fields]
+                    # Пропускаем если это не сумма
+                    if re.match(r'\d{2}\.\d{2}\.\d{4}', amount_str) or not amount_str.strip():
+                        continue
 
-                    trans_sum_str = unidecode(trans_sum_str).replace(' ', '').replace(',', '.')
-                    trans_sum = float(trans_sum_str)
+                    # Обработка суммы
+                    amount_str_clean = unidecode(amount_str).replace(' ', '').replace(',', '.')
 
-                    debit = trans_sum if trans_sum_str[0] == '+' else 0
-                    credit = trans_sum if trans_sum_str[0] != '+' else 0
+                    try:
+                        if amount_str_clean.startswith('+'):
+                            amount = float(amount_str_clean[1:])
+                            debit = 0
+                            credit = amount
+                        else:
+                            amount = float(amount_str_clean)
+                            debit = amount
+                            credit = 0
 
-                    transaction = {
-                        'bank': 'Sber',
-                        'trans_datetime': datetime.strptime(' '.join((trans_date, trans_time)),
-                                                            '%d.%m.%Y %H:%M'),
-                        'transfer_datetime': datetime.strptime(transfer_date, '%d.%m.%Y'),
-                        'auth_code': auth_code,
-                        'category': category,
-                        'debit': debit,
-                        'credit': credit,
-                        'text': text
-                    }
+                        transaction = {
+                            'bank': 'Sber',
+                            'trans_datetime': datetime.strptime(f'{trans_date} {trans_time}', '%d.%m.%Y %H:%M'),
+                            'transfer_datetime': datetime.strptime(trans_date, '%d.%m.%Y'),
+                            'auth_code': '',
+                            'category': category,
+                            'debit': debit,
+                            'credit': credit,
+                            'text': description
+                        }
 
-                    transactions.append(transaction)
-                    i += num_fields
+                        transactions.append(transaction)
+
+                    except (ValueError, IndexError):
+                        i += 1
+                        continue
                 else:
-                    if len(transactions) != 0:
-                        transactions[-1]['text'] += ' ' + rows[i]
                     i += 1
 
     return transactions
 
 
 if __name__ == '__main__':
-    print(get_transactions())
+    transactions = get_transactions()
+    print(f"Found {len(transactions)} transactions")
+    for t in transactions[:3]:  # покажем первые 3
+        print(t)

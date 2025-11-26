@@ -13,7 +13,7 @@ def get_transactions():
     transactions = []
 
     for filename in filenames:
-        df = pd.read_excel(filename, sheet_name='Отчет по операциям', header=0).replace('nan', np.nan).fillna('')
+        df = pd.read_excel(filename, sheet_name='Sheet1', header=0).replace('nan', np.nan).fillna('')
 
         for _, row in df.iterrows():
             (
@@ -26,9 +26,13 @@ def get_transactions():
 
             transaction = {
                 'bank': 'Tinkoff',
-                'trans_datetime': datetime.strptime(trans_datetime, '%d.%m.%Y %H:%M:%S'),
-                'transfer_datetime': None if transfer_datetime == ''
-                else datetime.strptime(transfer_datetime, '%d.%m.%Y'),
+                'trans_datetime': trans_datetime.to_pydatetime() if hasattr(trans_datetime,
+                                                                            'to_pydatetime') else datetime.strptime(
+                    str(trans_datetime), '%d.%m.%Y %H:%M:%S'),
+                'transfer_datetime': None if pd.isna(transfer_datetime) or transfer_datetime == ''
+                else (transfer_datetime.to_pydatetime() if hasattr(transfer_datetime,
+                                                                   'to_pydatetime') else datetime.strptime(
+                    str(transfer_datetime), '%d.%m.%Y')),
                 'pan': pan,
                 'status': status,
                 'debit': trans_sum if trans_sum > 0 else 0,

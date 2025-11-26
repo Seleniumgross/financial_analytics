@@ -1,5 +1,3 @@
-version: '3.9'
-
 services:
   postgres:
     image: postgres:16-alpine
@@ -13,7 +11,7 @@ services:
     ports:
       - ${POSTGRES_PORT}:5432
     volumes:
-      - postgresvol:/var/lib/docker/volumes/postgresvol/_data
+      - postgres_data:/var/lib/postgresql/data
     networks:
       - metapost
 
@@ -24,10 +22,12 @@ services:
     environment:
       PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL}
       PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD}
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: 'False'
     ports:
       - ${PGADMIN_PORT}:80
     volumes:
-      - pgadminvol:/var/lib/docker/volumes/pgadminvol/_data
+      - pgadmin_data:/var/lib/pgadmin
     networks:
       - metapost
 
@@ -37,28 +37,52 @@ services:
     hostname: metabase
     environment:
       MB_DB_TYPE: postgres
-      MB_DB_HOST: ${POSTGRES_HOST}
-      MB_DB_PORT: ${POSTGRES_PORT}
-      MB_DB_DBNAME: ${POSTGRES_DB}
-      MB_DB_USER: ${POSTGRES_USER}
-      MB_DB_PASS: ${POSTGRES_PASSWORD}
+      MB_DB_DBNAME: metabase_config  # ← ОТДЕЛЬНАЯ БАЗА ДЛЯ КОНФИГА
+      MB_DB_HOST: postgres
+      MB_DB_PORT: 5432
+      MB_DB_USER: postgres
+      MB_DB_PASS: postgres
+      MB_EMBEDDING_SECRET_KEY: ${METABASE_SECRET_KEY:-supersecretkey}
     ports:
       - ${METABASE_PORT}:3000
     volumes:
-      - metabasevol:/var/lib/docker/volumes/metabasevol/_data
+      - metabase_data:/metabase-data
     networks:
       - metapost
+    depends_on:
+      - postgres
+
+  superset:
+    image: apache/superset:latest
+    container_name: superset
+    environment:
+      - SUPERSET_SECRET_KEY=supersecretkey
+      - DATABASE_DB=superset
+      - DATABASE_HOST=postgres
+      - DATABASE_PASSWORD=postgres
+      - DATABASE_USER=postgres
+      - DATABASE_PORT=5432
+    ports:
+      - 8088:8088
+    networks:
+      - metapost
+    depends_on:
+      - postgres
     healthcheck:
-      test: curl --fail -I http://localhost:3000/api/health || exit 1
-      interval: 15s
-      timeout: 5s
-      retries: 5
+      test: [ "CMD", "curl", "-f", "http://localhost:8088/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
 volumes:
-  postgresvol:
-  pgadminvol:
-  metabasevol:
+  postgres_data:
+    driver: local
+  pgadmin_data:
+    driver: local
+  metabase_data:
+    driver: local
 
 networks:
   metapost:
     driver: bridge
+
