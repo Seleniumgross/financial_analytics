@@ -2,7 +2,6 @@ import glob
 import re
 from datetime import datetime
 from unidecode import unidecode
-
 import fitz
 
 PATH = '../input/sber'
@@ -17,51 +16,85 @@ def get_transactions():
 
         for page in file:
             text = page.get_text()
-            lines = text.split('\n')
+            lines = [line.strip() for line in text.split('\n') if line.strip()]
 
             i = 0
-            while i < len(lines) - 3:
-                # Ищем дату операции в формате 10.11.2025
+            while i < len(lines) - 4:
+                # Ищем дату операции (например: 23.11.2025)
                 if re.match(r'\d{2}\.\d{2}\.\d{4}', lines[i]):
                     trans_date = lines[i]
 
-                    # Проверяем есть ли время на следующей строке
+                    # Проверяем следующую строку - может быть время или сразу категория
                     if i + 1 < len(lines) and ':' in lines[i + 1]:
                         trans_time = lines[i + 1]
-                        category = lines[i + 2] if i + 2 < len(lines) else ""
-                        amount_str = lines[i + 3] if i + 3 < len(lines) else ""
-
-                        # Пропускаем строку с датой обработки и кодом
-                        if i + 4 < len(lines) and re.match(r'\d{2}\.\d{2}\.\d{4}', lines[i + 4]):
-                            description = lines[i + 5] if i + 5 < len(lines) else ""
-                            i += 6
+                        # Пропускаем код авторизации (например: 686359)
+                        if i + 3 < len(lines):
+                            category = lines[i + 3]
                         else:
-                            description = ""
-                            i += 4
+                            category = ""
+
+                        # Сумма обычно через 1-2 строки после категории
+                        amount_idx = i + 4
+                        while amount_idx < len(lines) and amount_idx < i + 7:
+                            if re.search(r'[+-]?\d[\d\s]*,\d{2}', lines[amount_idx]):
+                                amount_str = lines[amount_idx]
+                                break
+                            amount_idx += 1
+                        else:
+                            amount_str = ""
+
+                        # Описание может быть перед или после суммы
+                        description = ""
+                        for desc_idx in range(i + 2, min(i + 8, len(lines))):
+                            if (desc_idx != amount_idx and
+                                    not re.match(r'\d{2}\.\d{2}\.\d{4}', lines[desc_idx]) and
+                                    ':' not in lines[desc_idx] and
+                                    not re.search(r'[+-]?\d[\d\s]*,\d{2}', lines[desc_idx]) and
+                                    len(lines[desc_idx]) > 5):
+                                description = lines[desc_idx]
+                                break
+
+                        i = amount_idx + 1 if amount_str else i + 5
+
                     else:
-                        # Если нет времени, ищем категорию и сумму
+                        # Нет времени, идем по другой структуре
                         trans_time = '00:00'
                         category = lines[i + 1] if i + 1 < len(lines) else ""
-                        amount_str = lines[i + 2] if i + 2 < len(lines) else ""
-                        description = lines[i + 3] if i + 3 < len(lines) else ""
-                        i += 4
 
-                    # Пропускаем если это не сумма
-                    if re.match(r'\d{2}\.\d{2}\.\d{4}', amount_str) or not amount_str.strip():
-                        continue
+                        # Ищем сумму
+                        amount_str = ""
+                        for j in range(i + 2, min(i + 5, len(lines))):
+                            if re.search(r'[+-]?\d[\d\s]*,\d{2}', lines[j]):
+                                amount_str = lines[j]
+                                break
+
+                        description = ""
+                        for j in range(i + 2, min(i + 6, len(lines))):
+                            if (j != i + 2 or not amount_str) and not re.match(r'\d{2}\.\d{2}\.\d{4}', lines[j]):
+                                description = lines[j]
+                                break
+
+                        i = i + 4 if amount_str else i + 3
 
                     # Обработка суммы
-                    amount_str_clean = unidecode(amount_str).replace(' ', '').replace(',', '.')
+                    if amount_str:
+                        amount_str_clean = unidecode(amount_str).replace(' ', '').replace(',', '.').replace('\xa0', '')
 
-                    try:
+                        # Убираем знак + и определяем дебет/кредит
                         if amount_str_clean.startswith('+'):
-                            amount = float(amount_str_clean[1:])
+                            amount_value = float(amount_str_clean[1:])
                             debit = 0
-                            credit = amount
-                        else:
-                            amount = float(amount_str_clean)
-                            debit = amount
+                            credit = amount_value
+                        elif amount_str_clean.startswith('-'):
+                            amount_value = float(amount_str_clean[1:])
+                            debit = amount_value
                             credit = 0
+                        else:
+                            # Если нет знака, определяем по контексту
+                            amount_value = float(amount_str_clean)
+                            # Обычно положительные - пополнения, отрицательные - списания
+                            debit = 0 if amount_value >= 0 else abs(amount_value)
+                            credit = amount_value if amount_value >= 0 else 0
 
                         transaction = {
                             'bank': 'Sber',
@@ -76,9 +109,6 @@ def get_transactions():
 
                         transactions.append(transaction)
 
-                    except (ValueError, IndexError):
-                        i += 1
-                        continue
                 else:
                     i += 1
 
@@ -88,5 +118,5 @@ def get_transactions():
 if __name__ == '__main__':
     transactions = get_transactions()
     print(f"Found {len(transactions)} transactions")
-    for t in transactions[:3]:  # покажем первые 3
-        print(t)
+    for t in transactions:
+        print(f"{t['trans_datetime']} | {t['category']} | {t['text']} | Дебет: {t['debit']} | Кредит: {t['credit']}")

@@ -60,71 +60,64 @@ class SberTransaction(Base):
         self.text = text
 
 
-class SberAccountTransaction(Base):
-    __tablename__ = 'sber_account'
+class AlphaTransaction(Base):
+    __tablename__ = 'alpha'
     trans_id = Column(Integer, primary_key=True)
     bank = Column(String)
     trans_datetime = Column(DateTime)
+    transfer_datetime = Column(DateTime)
+    pan = Column(String)
+    status = Column(String)
+    debit = Column(Float)
+    credit = Column(Float)
+    trans_currency = Column(String)
+    pay_sum = Column(Float)
+    pay_currency = Column(String)
+    cashback = Column(String)
     category = Column(String)
-    account = Column(String)
-    income_balance = Column(Float)
-    debit = Column(Float)
-    credit = Column(Float)
+    mcc = Column(String)
     text = Column(String)
+    bonus = Column(Float)
+    rounding = Column(Float)
+    sum_with_rounding = Column(Float)
     load_date = Column(Date, default=date.today())
     __table_args__ = (
         UniqueConstraint(
             'bank',
             'trans_datetime',
+            'pan',
+            'status',
+            'debit',
+            'credit',
+            'trans_currency',
+            'pay_sum',
+            'pay_currency',
             'category',
-            'account',
-            'income_balance',
-            'debit',
-            'credit'
+            'mcc'
         ),
     )
 
-    def __init__(self, bank, trans_datetime, category, account, income_balance, debit, credit, text):
+    def __init__(self, bank, trans_datetime, transfer_datetime, pan, status, debit, credit,
+                 trans_currency, pay_sum, pay_currency, cashback, category, mcc, text,
+                 bonus, rounding, sum_with_rounding):
         self.bank = bank
         self.trans_datetime = trans_datetime
+        self.transfer_datetime = transfer_datetime
+        self.pan = pan
+        self.status = status
+        self.debit = debit
+        self.credit = credit
+        self.trans_currency = trans_currency
+        self.pay_sum = pay_sum
+        self.pay_currency = pay_currency
+        self.cashback = cashback
         self.category = category
-        self.account = account
-        self.income_balance = income_balance
-        self.debit = debit
-        self.credit = credit
+        self.mcc = mcc
         self.text = text
+        self.bonus = bonus
+        self.rounding = rounding
+        self.sum_with_rounding = sum_with_rounding
 
-
-class SovcomTransaction(Base):
-    __tablename__ = 'sovcom'
-    trans_id = Column(Integer, primary_key=True)
-    bank = Column(String)
-    trans_datetime = Column(DateTime)
-    account = Column(String)
-    income_balance = Column(Float)
-    debit = Column(Float)
-    credit = Column(Float)
-    text = Column(String)
-    load_date = Column(Date, default=date.today())
-    __table_args__ = (
-        UniqueConstraint(
-            'bank',
-            'trans_datetime',
-            'account',
-            'income_balance',
-            'debit',
-            'credit'
-        ),
-    )
-
-    def __init__(self, bank, trans_datetime, account, income_balance, debit, credit, text):
-        self.bank = bank
-        self.trans_datetime = trans_datetime
-        self.account = account
-        self.income_balance = income_balance
-        self.debit = debit
-        self.credit = credit
-        self.text = text
 
 
 class TinkoffTransaction(Base):

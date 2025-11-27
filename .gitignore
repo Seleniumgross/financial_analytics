@@ -4,3 +4,6 @@ loaded/
 *.env
 temp/
 __pycache__/
+/input/tinkoff/Operations Wed Jan 01 2025-Wed Nov 26 2025.xls
+/input/alpha/Statement 01.01.2025 - 26.11.2025.CSV
+/input/sber/выписка по счёту дебетовой карты.pdf
